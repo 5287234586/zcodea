@@ -71,7 +71,8 @@
 - **proot 双引擎**：主引擎为 [build-proot-android](https://github.com/green-green-avk/build-proot-android)（NDK 构建、静态 talloc、外置 loader），回退引擎为 Termux deb（proot + libtalloc + libandroid-shmem）；容器探针失败时自动互换重试一次。
 - **首次装机需联网**：rootfs/Node/ZCode 走官方源 + 清华镜像 + npmmirror 多路回退 + SHA-256 清单校验；断网无法装机（v0.2 计划内置离线包，像 DSHA 一样打进 APK）。
 - **无内核级沙箱**：proot 只是用户态路径转译，bubblewrap 在 Android sepolicy 下同样不可用（容器派与 Termux 派的共同边界）。权限靠 `--mode` 档位控制，默认 `yolo`，可在设置改为 `guarded`。
-- **简易终端非完整 xterm**：展示时清洗 ANSI 转义序列，vim/htop 等全屏 TUI 显示不完整；v0.2 计划接入 Termux terminal-emulator JNI。
+- **真 PTY 终端（v0.3）**：接入 Termux terminal-emulator/terminal-view（JNI 伪终端，JitPack 依赖），vim / htop / zcode 全屏 TUI 可用；带 Ctrl/Esc/Tab/方向键快捷行。
+- 桥上的 `/app/terminal/*` 仍为简易管道终端（给 agent 用），与 UI 的 PTY 终端相互独立。
 - **局域网访问（v0.3）**：主页「局域网访问」开关开启后，桥绑定 0.0.0.0；非回环请求必须带 token（`Authorization: Bearer` / `X-Token` / `?token=` 任一），UI 地址栏自带 `?token=`。注意是**明文 HTTP**，只在可信 Wi-Fi 下用；token 可随时重新生成，开关切换需重启服务。
 - 调试端点 `POST /app/env/exec`（容器内执行）仅 debug 构建开放 `!host` 前缀。
 - **聊天为单发模式**：每次消息一个 `zcode -p` 进程，串行执行；会话恢复靠 zcode 自身的 `--resume`/`-c`（尚未接出）。

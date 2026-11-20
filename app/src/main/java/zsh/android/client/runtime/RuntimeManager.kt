@@ -173,7 +173,83 @@ class RuntimeManager(
         return job
     }
 
-    // ---------------------------------------------------------------- terminal
+    // ---------------------------------------------------------------- PTY 终端（v0.3 真 TUI）
+
+    var ptySession: com.termux.terminal.TerminalSession? = null
+        private set
+
+    private val ptyClient = object : com.termux.terminal.TerminalSessionClient {
+        override fun onTextChanged(session: com.termux.terminal.TerminalSession) {}
+        override fun onTitleChanged(session: com.termux.terminal.TerminalSession) {}
+        override fun onSessionFinished(session: com.termux.terminal.TerminalSession) {
+            appendTerm("[zcodea] PTY 会话已结束")
+        }
+        override fun onCopyTextToClipboard(session: com.termux.terminal.TerminalSession, text: String) {}
+        override fun onPasteTextFromClipboard(session: com.termux.terminal.TerminalSession) {}
+        override fun onBell(session: com.termux.terminal.TerminalSession) {}
+        override fun onColorsChanged(session: com.termux.terminal.TerminalSession) {}
+        override fun onTerminalCursorStateChange(state: Boolean) {}
+        override fun getTerminalCursorStyle(): Int = 0
+        override fun logError(tag: String, message: String) {
+            android.util.Log.e("RuntimeManager", "$tag: $message")
+        }
+        override fun logWarn(tag: String, message: String) {
+            android.util.Log.w("RuntimeManager", "$tag: $message")
+        }
+        override fun logInfo(tag: String, message: String) {
+            android.util.Log.i("RuntimeManager", "$tag: $message")
+        }
+        override fun logDebug(tag: String, message: String) {
+            android.util.Log.d("RuntimeManager", "$tag: $message")
+        }
+        override fun logVerbose(tag: String, message: String) {
+            android.util.Log.v("RuntimeManager", "$tag: $message")
+        }
+        override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) {
+            android.util.Log.e("RuntimeManager", "$tag: $message", e)
+        }
+        override fun logStackTrace(tag: String, e: Exception) {
+            android.util.Log.e("RuntimeManager", tag, e)
+        }
+    }
+
+    /** 真 PTY：JNI 开伪终端，fork+exec proot（bash 在容器里），vim/htop/zcode TUI 可用。 */
+    fun startPtyTerminal(): Boolean {
+        if (ptySession?.isRunning == true) return true
+        val cmd = ProotCmd.containerCommand(paths, listOf("/usr/bin/script", "-qfc", "/bin/bash", "/dev/null"))
+        val args = cmd.drop(1).toTypedArray()
+        val env = ProotCmd.hostEnv(paths).map { (k, v) -> "$k=$v" }.toTypedArray()
+        return try {
+            ptySession = com.termux.terminal.TerminalSession(
+                paths.prootBinary.absolutePath,
+                paths.nativeDir.absolutePath,
+                args,
+                env,
+                null,
+                ptyClient,
+            )
+            val ok = ptySession?.isRunning == true
+            appendTerm(if (ok) "[zcodea] PTY bash 已启动" else "[zcodea] PTY 会话启动失败")
+            ok
+        } catch (e: Exception) {
+            appendTerm("[zcodea] PTY 启动异常：${e.message}")
+            false
+        }
+    }
+
+    fun stopPtyTerminal() {
+        ptySession?.finishIfRunning()
+        ptySession = null
+    }
+
+    fun ptyRunning(): Boolean = ptySession?.isRunning == true
+
+    fun ptyWrite(data: ByteArray) {
+        val s = ptySession ?: return
+        if (s.isRunning) s.write(data, 0, data.size)
+    }
+
+    // ---------------------------------------------------------------- 简易终端（桥接 API 用）
 
     fun startTerminal(): Boolean {
         synchronized(termLock) {

@@ -53,6 +53,9 @@ dependencies {
     implementation("commons-io:commons-io:2.16.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // 真 PTY 终端（Termux terminal-emulator/terminal-view，Apache-2.0，见 THIRD_PARTY_NOTICES）
+    implementation("com.github.termux.termux-app:terminal-emulator:v0.118.3")
+    implementation("com.github.termux.termux-app:terminal-view:v0.118.3")
 
     testImplementation("junit:junit:4.13.2")
     // 单测里用真实的 org.json（Android SDK 里的在 JVM 单测中只是 stub）
