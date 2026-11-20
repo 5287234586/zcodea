@@ -6,3 +6,7 @@ build/
 local.properties
 captures/
 *.apk.idsig
+
+# 离线环境资产（体积大，构建时自动下载）
+.offline-cache/
+app/src/main/assets/offline/

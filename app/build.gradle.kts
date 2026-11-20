@@ -35,10 +35,29 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources {
+        noCompress.add("tgz") // 离线资产已压缩；避免 aapt2 对 .gz 的解包重存行为
+    }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 }
+
+
+// ---- 离线环境打包（Ubuntu rootfs + Node 预置进 assets）----
+val bundleOfflineEnv = tasks.register("bundleOfflineEnv") {
+    outputs.dir(file("src/main/assets/offline"))
+    doLast {
+        val py = if (org.gradle.internal.os.OperatingSystem.current().isWindows) "python" else "python3"
+        exec {
+            commandLine(py, rootDir.resolve("tools/bundle-offline.py").absolutePath)
+            environment("OFFLINE_OUT", file("src/main/assets/offline").absolutePath)
+            environment("OFFLINE_CACHE", rootDir.resolve(".offline-cache").absolutePath)
+        }
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(bundleOfflineEnv) }
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")

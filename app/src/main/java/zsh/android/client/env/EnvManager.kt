@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import zsh.android.client.runtime.ProotCmd
 import zsh.android.client.store.Settings
 import java.io.File
@@ -36,6 +37,7 @@ class EnvManager(
     context: Context,
     private val settings: Settings,
 ) {
+    private val appContext = context.applicationContext
     val paths = EnvPaths(context.filesDir)
     private val downloader = Downloader()
     private val mutex = Mutex()
@@ -269,14 +271,21 @@ class EnvManager(
 
     private fun runRootfsStep(abi: Abi, receipt: Receipt) {
         val requested = settings.ubuntuVersion
-        log("下载 Ubuntu base $requested（${abi.ubuntuArch}，约 35MB）…")
         paths.rootfs.deleteRecursively()
         paths.rootfs.mkdirs()
         val tarball = File(paths.downloads, "ubuntu-base.tar.gz")
-        downloader.download(Sources.ubuntuRootfsCandidates(requested, abi), tarball)
-        val actualVersion = Regex("ubuntu-base-([\\d.]+)-base-").find(downloader.lastUrl ?: "")
-            ?.groupValues?.get(1) ?: requested
-        if (actualVersion != requested) log("· 请求版本不存在，改用 $actualVersion")
+        val offlineRootfs = offlineAsset("rootfs-${abi.ubuntuArch}.tgz", tarball)
+        val actualVersion: String
+        if (offlineRootfs != null) {
+            actualVersion = offlineRootfs.second.optString("version", requested)
+            log("· 使用内置离线 rootfs（$actualVersion，${abi.ubuntuArch}）")
+        } else {
+            log("下载 Ubuntu base $requested（${abi.ubuntuArch}，约 35MB）…")
+            downloader.download(Sources.ubuntuRootfsCandidates(requested, abi), tarball)
+            actualVersion = Regex("ubuntu-base-([\\d.]+)-base-").find(downloader.lastUrl ?: "")
+                ?.groupValues?.get(1) ?: requested
+            if (actualVersion != requested) log("· 请求版本不存在，改用 $actualVersion")
+        }
 
         verifyChecksums(
             tarball,
@@ -332,15 +341,22 @@ class EnvManager(
     // ---------------------------------------------------------------- node
 
     private fun runNodeStep(abi: Abi, receipt: Receipt) {
-        val version = settings.nodeVersion
-        log("下载 Node.js $version（linux-${abi.nodeArch}，约 50MB）…")
         val tarball = File(paths.downloads, "node.tar.gz")
-        downloader.download(Sources.nodeTarballCandidates(version, abi), tarball)
-        verifyChecksums(
-            tarball,
-            "node-$version-linux-${abi.nodeArch}.tar.gz",
-            Sources.nodeShaSumsCandidates(version),
-        )
+        val offlineNode = offlineAsset("node-${abi.nodeArch}.tgz", tarball)
+        val version: String
+        if (offlineNode != null) {
+            version = offlineNode.second.optString("version", settings.nodeVersion)
+            log("· 使用内置离线 Node（$version，linux-${abi.nodeArch}）")
+        } else {
+            version = settings.nodeVersion
+            log("下载 Node.js $version（linux-${abi.nodeArch}，约 50MB）…")
+            downloader.download(Sources.nodeTarballCandidates(version, abi), tarball)
+            verifyChecksums(
+                tarball,
+                "node-$version-linux-${abi.nodeArch}.tar.gz",
+                Sources.nodeShaSumsCandidates(version),
+            )
+        }
         log("解压到 /opt/node …")
         paths.nodeInRootfs.deleteRecursively()
         paths.nodeInRootfs.mkdirs()
@@ -385,6 +401,45 @@ class EnvManager(
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /**
+     * 从 APK 内置离线资产取包（assets/offline/，见 gradle bundleOfflineEnv 任务）。
+     * 校验 manifest sha256，通过则落到 dest 并返回版本元信息；缺失/损坏返回 null（走网络）。
+     */
+    private fun offlineAsset(name: String, dest: File): Pair<File, JSONObject>? {
+        return runCatching {
+            val manifest = JSONObject(
+                appContext.assets.open("offline/manifest.json").bufferedReader().use { it.readText() },
+            )
+            // 调用方传文件名（rootfs-amd64.tgz），manifest 键不带扩展名
+            val key = name.removeSuffix(".tgz")
+            val sha = manifest.optString(key, "")
+            if (sha.isEmpty()) {
+                log("· manifest 中没有 $key（keys=" + manifest.keys().asSequence().toList() + "）")
+                return null
+            }
+            val tmp = File(dest.parentFile, dest.name + ".asset")
+            appContext.assets.open("offline/$name").use { input ->
+                tmp.outputStream().use { input.copyTo(it) }
+            }
+            if (!Checksum.matches(tmp, sha)) {
+                log("⚠ 内置离线包 $name SHA-256 不符，回退网络下载")
+                tmp.delete()
+                return null
+            }
+            if (dest.exists()) dest.delete()
+            if (!tmp.renameTo(dest)) tmp.copyTo(dest, overwrite = true)
+            val versionMeta = when {
+                key.startsWith("rootfs-") -> manifest.optString("_rootfsVersion", "")
+                key.startsWith("node-") -> manifest.optString("_nodeVersion", "")
+                else -> ""
+            }
+            dest to JSONObject().put("version", versionMeta)
+        }.getOrElse {
+            log("· 内置离线资产读取异常：${it.message}")
+            null
+        }
+    }
 
     private fun verifyChecksums(file: File, fileName: String, sumsUrlCandidates: List<String>) {
         for (url in sumsUrlCandidates) {
