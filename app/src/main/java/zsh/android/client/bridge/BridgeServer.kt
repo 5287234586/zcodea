@@ -86,6 +86,13 @@ class BridgeServer(
             uri == "/app/chat/stream" && method == Method.GET -> chatStream(session)
             uri == "/app/chat/result" && method == Method.GET -> chatResult(session)
 
+            uri == "/app/agent/send" && method == Method.POST -> agentSend(session)
+            uri == "/app/agent/events" && method == Method.GET -> agentEvents(session)
+            uri == "/app/agent/messages" && method == Method.GET -> agentMessages()
+            uri == "/app/agent/stop" && method == Method.POST -> agentStop()
+            uri == "/app/agent/new" && method == Method.POST -> agentNew()
+            uri == "/app/agent/status" && method == Method.GET -> agentStatus()
+
             uri == "/app/login" && method == Method.POST -> postLogin(session)
             uri == "/app/job" && method == Method.GET -> jobStatus(session)
 
@@ -138,6 +145,10 @@ class BridgeServer(
             .put("chatBusy", runtime.isChatBusy())
             .put("terminalRunning", runtime.terminalRunning)
             .put("workspace", "/root/zsha")
+            .put("agentMode", settings.agentSessionMode)
+            .put("agentServer", runtime.agentServerStatus())
+            .put("agentSessionId", runtime.agentSessionId ?: JSONObject.NULL)
+            .put("agentBusy", runtime.agentBusy.value)
         if (receipt != null) obj.put("versions", JSONObject(receipt.versions.toMap()))
         return obj
     }
@@ -163,9 +174,14 @@ class BridgeServer(
             "GET  /app/device      设备信息",
             "POST /app/env/install 触发装机流水线（幂等，202 返回）",
             "GET  /app/env/log     装机日志",
-            "POST /app/chat       {message} → {job}（同一时刻一条）",
+            "POST /app/chat       {message} → {job}（-p 单发，同一时刻一条）",
             "GET  /app/chat/stream?job&after  SSE 行流（event: line / done）",
             "GET  /app/chat/result?job&after   轮询兜底",
+            "POST /app/agent/send  {message} → 202（app-server 会话模式，流式）",
+            "GET  /app/agent/events    SSE 原始事件流（ZCode Protocol）",
+            "GET  /app/agent/messages  会话历史",
+            "POST /app/agent/stop|new  停止 / 新建会话",
+            "GET  /app/agent/status    会话状态",
             "POST /app/login       {provider: zai|bigmodel} → {job}（输出含 OAuth URL）",
             "GET  /app/job?id      任务状态与输出",
             "POST /app/terminal/start|stop|input  简易终端",
@@ -281,6 +297,66 @@ class BridgeServer(
     }
 
     private fun envReady(): Boolean = env.phase.value is EnvPhase.Ready
+
+    // ------------------------------------------------------------- agent（v0.2 会话模式）
+
+    private fun agentStatus(): Response {
+        val s = runtime.appServer.state.value
+        return jsonOk(
+            JSONObject()
+                .put("server", runtime.agentServerStatus())
+                .put("sessionId", runtime.agentSessionId ?: JSONObject.NULL)
+                .put("busy", runtime.agentBusy.value)
+                .put("mode", if (settings.agentSessionMode) "session" else "prompt")
+        )
+    }
+
+    private fun agentSend(session: IHTTPSession): Response {
+        if (!envReady()) return json(Response.Status.SERVICE_UNAVAILABLE, JSONObject().put("error", "环境未就绪"))
+        if (!settings.agentSessionMode) return badRequest("会话模式未启用（设置 → agentSessionMode）")
+        val message = readBody(session).optString("message").trim()
+        if (message.isEmpty()) return badRequest("message 不能为空")
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { runtime.agentSend(message) }
+                .onFailure { android.util.Log.w("BridgeServer", "agentSend: ${it.message}") }
+        }
+        return json(Response.Status.ACCEPTED, JSONObject().put("accepted", true))
+    }
+
+    /** SSE：app-server 的全部通知/反向请求原样转发（data: <json>）。客户端断开时写入端会收到 IOException 自行收尾。 */
+    private fun agentEvents(session: IHTTPSession): Response {
+        val pipeIn = PipedInputStream(64 * 1024)
+        val pipeOut = PipedOutputStream(pipeIn)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                runtime.appServer.events.collect { msg ->
+                    pipeOut.write("data: ${msg.toString().replace("\n", " ")}\n\n".toByteArray(Charsets.UTF_8))
+                    pipeOut.flush()
+                }
+            } catch (_: Exception) {
+            } finally {
+                runCatching { pipeOut.close() }
+            }
+        }
+        return newChunkedResponse(Response.Status.OK, "text/event-stream", pipeIn)
+    }
+
+    private fun agentMessages(): Response = try {
+        val result = kotlinx.coroutines.runBlocking { runtime.agentMessages() }
+        jsonOk(result)
+    } catch (e: Exception) {
+        json(Response.Status.INTERNAL_ERROR, JSONObject().put("error", e.message ?: "failed"))
+    }
+
+    private fun agentStop(): Response {
+        CoroutineScope(Dispatchers.IO).launch { runCatching { runtime.agentStop() } }
+        return jsonOk(JSONObject().put("ok", true))
+    }
+
+    private fun agentNew(): Response {
+        CoroutineScope(Dispatchers.IO).launch { runCatching { runtime.agentNewSession() } }
+        return jsonOk(JSONObject().put("ok", true))
+    }
 
     /** 触发装机流水线（幂等：已就绪/进行中直接返回当前状态）。 */
     private fun envInstall(): Response {

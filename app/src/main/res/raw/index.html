@@ -17,7 +17,7 @@
     display: flex; flex-direction: column;
   }
   header {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 8px;
     padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel);
     position: sticky; top: 0; z-index: 5;
   }
@@ -32,6 +32,7 @@
   }
   button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--user); border-color: var(--user); }
+  button.icon { padding: 8px 10px; font-size: 13px; }
   #chat { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 92%; padding: 9px 12px; border-radius: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
   .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
@@ -39,6 +40,9 @@
   .msg.agent.streaming::after { content: "▊"; color: var(--accent); animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
   .msg.error { align-self: center; background: #2a1215; border: 1px solid #7f1d1d; color: #fca5a5; font-size: 13px; }
+  .evt { align-self: flex-start; color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; max-width: 92%;
+         border-left: 2px solid var(--line); padding-left: 8px; }
+  .evt .body { margin-top: 2px; word-break: break-all; }
   .hint { color: var(--muted); font-size: 13px; text-align: center; margin-top: 8px; }
   footer { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); }
   #input { flex: 1; background: #0d1526; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 15px; outline: none; }
@@ -46,7 +50,7 @@
   dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; max-width: 92vw; padding: 18px; }
   dialog::backdrop { background: rgba(0,0,0,.6); }
   dialog h3 { margin: 0 0 12px; font-size: 16px; }
-  dialog .row { display: flex; gap: 8px; margin-top: 12px; }
+  dialog .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   dialog a { color: var(--accent); word-break: break-all; }
   .muted { color: var(--muted); font-size: 13px; }
 </style>
@@ -56,11 +60,13 @@
   <span class="logo">ZSHA</span>
   <span class="pill" id="status">…</span>
   <span class="spacer"></span>
+  <button class="icon" id="newBtn" title="新建会话">＋</button>
+  <button class="icon" id="stopBtn" title="停止当前任务">■</button>
   <button id="loginBtn" title="登录 GLM">登录</button>
 </header>
 
 <div id="chat">
-  <div class="hint">消息每次以 <code>zcode -p</code> 无界面模式运行；工作目录 /root/zsha。<br>首次使用请先点右上角「登录」完成 GLM 授权。</div>
+  <div class="hint" id="hint">会话模式：消息经 ZCode Protocol 流式返回；工作目录 /root/zsha。<br>首次使用请先点右上角「登录」完成 GLM 授权。</div>
 </div>
 
 <footer>
@@ -86,11 +92,19 @@ const input = document.getElementById('input');
 const sendBtn = document.getElementById('sendBtn');
 const statusPill = document.getElementById('status');
 const loginBtn = document.getElementById('loginBtn');
+const newBtn = document.getElementById('newBtn');
+const stopBtn = document.getElementById('stopBtn');
 const loginDialog = document.getElementById('loginDialog');
 const loginStatus = document.getElementById('loginStatus');
 const loginUrlBox = document.getElementById('loginUrlBox');
 const loginUrl = document.getElementById('loginUrl');
-let streaming = false;
+
+let mode = 'session';      // session | prompt
+let envReady = false;
+let agentBusy = false;
+let streaming = false;     // prompt 模式下
+let currentBubble = null;  // agent 模式当前接收中的气泡
+let eventsEs = null;
 
 function addMsg(cls, text) {
   const div = document.createElement('div');
@@ -101,28 +115,138 @@ function addMsg(cls, text) {
   return div;
 }
 
+function addEvt(method, body) {
+  const div = document.createElement('div');
+  div.className = 'evt';
+  const head = document.createElement('div');
+  head.textContent = method;
+  div.appendChild(head);
+  if (body) {
+    const b = document.createElement('div');
+    b.className = 'body';
+    b.textContent = body;
+    div.appendChild(b);
+  }
+  chat.appendChild(div);
+  while (chat.children.length > 400) chat.removeChild(chat.firstChild);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function setHintIfEmpty(on) {
+  const hint = document.getElementById('hint');
+  if (hint && on && chat.children.length === 1) return;
+  if (hint) hint.remove();
+}
+
+/* 从事件 params 里尽力抽取文本字段 */
+function extractText(params) {
+  if (!params || typeof params !== 'object') return null;
+  const keys = ['content', 'text', 'delta', 'fragment', 'chunk', 'message', 'output'];
+  for (const k of keys) {
+    const v = params[k];
+    if (typeof v === 'string' && v.length) return v;
+    if (v && typeof v === 'object') {
+      for (const k2 of keys) {
+        if (typeof v[k2] === 'string' && v[k2].length) return v[k2];
+      }
+    }
+  }
+  // 常见嵌套：params.message.content / params.entry.text
+  for (const k of Object.keys(params)) {
+    const v = params[k];
+    if (v && typeof v === 'object') {
+      const t = extractText(v);
+      if (t) return t;
+    }
+  }
+  return null;
+}
+
 async function refreshStatus() {
   try {
     const r = await fetch('/app/status');
     const s = await r.json();
+    envReady = s.phase === 'ready';
+    mode = s.agentMode ? 'session' : 'prompt';
+    agentBusy = !!s.agentBusy;
     const phase = s.phase === 'ready' ? '就绪' : s.phase.startsWith('installing') ? '装机中' :
       s.phase.startsWith('failed') ? '装机失败' : s.phase.startsWith('abi') ? '架构不支持' : '未安装';
-    statusPill.textContent = phase + (s.chatBusy ? ' · 任务中' : '');
-    statusPill.className = 'pill ' + (s.phase === 'ready' ? 'ready' : (s.chatBusy ? 'busy' : ''));
-    sendBtn.disabled = streaming || s.phase !== 'ready';
-    loginBtn.disabled = s.phase !== 'ready';
+    const extra = mode === 'session' ? (agentBusy ? ' · 处理中' : '') : (s.chatBusy ? ' · 任务中' : '');
+    statusPill.textContent = phase + extra;
+    statusPill.className = 'pill ' + (s.phase === 'ready' ? 'ready' : ((s.chatBusy || agentBusy) ? 'busy' : ''));
+    sendBtn.disabled = !envReady || agentBusy || streaming;
+    loginBtn.disabled = !envReady;
+    stopBtn.disabled = !envReady || !(agentBusy || (mode === 'session' && s.agentSessionId));
   } catch (e) {
     statusPill.textContent = '桥不可达';
   }
 }
 
+function ensureEventStream() {
+  if (eventsEs || mode !== 'session' || !envReady) return;
+  eventsEs = new EventSource('/app/agent/events');
+  eventsEs.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    const method = msg.method || '';
+    if (!method) return;
+    const params = msg.params || msg.result || {};
+    if (method.startsWith('startup/')) return;
+    setHintIfEmpty(false);
+    if (method === 'session/lifecycle/changed') {
+      addEvt('会话状态', params.state || '');
+      return;
+    }
+    // 服务端反向请求（授权/输入等）原样展示，便于人工介入
+    if (msg.id !== undefined && msg.id !== null) {
+      addEvt('需要响应: ' + method, JSON.stringify(params).slice(0, 300));
+      return;
+    }
+    const text = extractText(params);
+    if (text) {
+      if (!currentBubble) {
+        currentBubble = addMsg('agent', '');
+        currentBubble.classList.add('streaming');
+      }
+      currentBubble.textContent += (currentBubble.textContent ? '\n' : '') + text;
+      chat.scrollTop = chat.scrollHeight;
+    } else {
+      addEvt(method, JSON.stringify(params).slice(0, 200));
+    }
+  };
+  eventsEs.onerror = () => {
+    eventsEs.close();
+    eventsEs = null;
+    if (currentBubble) { currentBubble.classList.remove('streaming'); currentBubble = null; }
+  };
+}
+
 async function send() {
   const text = input.value.trim();
-  if (!text || streaming) return;
+  if (!text || sendBtn.disabled) return;
   input.value = '';
+  setHintIfEmpty(false);
   addMsg('user', text);
-  streaming = true;
   sendBtn.disabled = true;
+
+  if (mode === 'session') {
+    const r = await fetch('/app/agent/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      addMsg('error', j.error || ('发送失败 HTTP ' + r.status));
+    } else {
+      ensureEventStream();
+    }
+    refreshStatus();
+    return;
+  }
+
+  // prompt 兼容模式（-p 单发）
+  streaming = true;
   let job;
   try {
     const r = await fetch('/app/chat', {
@@ -176,6 +300,19 @@ async function pollResult(job, bubble) {
   } catch (e) { refreshStatus(); }
 }
 
+newBtn.onclick = async () => {
+  await fetch('/app/agent/new', { method: 'POST' });
+  addEvt('会话', '已新建（下一轮生效）');
+  refreshStatus();
+};
+
+stopBtn.onclick = async () => {
+  await fetch('/app/agent/stop', { method: 'POST' });
+  if (currentBubble) { currentBubble.classList.remove('streaming'); currentBubble = null; }
+  addEvt('会话', '已请求停止');
+  refreshStatus();
+};
+
 loginBtn.onclick = () => { loginDialog.showModal(); };
 document.getElementById('loginClose').onclick = () => loginDialog.close();
 loginDialog.querySelectorAll('button[data-provider]').forEach(btn => {
@@ -215,7 +352,8 @@ loginDialog.querySelectorAll('button[data-provider]').forEach(btn => {
 sendBtn.onclick = send;
 input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 refreshStatus();
-setInterval(refreshStatus, 5000);
+setInterval(refreshStatus, 4000);
+setTimeout(ensureEventStream, 1500);
 </script>
 </body>
 </html>

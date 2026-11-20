@@ -34,6 +34,16 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_PERM_MODE, "yolo")!!
         set(value) = prefs.edit().putString(KEY_PERM_MODE, value).apply()
 
+    /** v0.2 会话模式：常驻 app-server（流式 + 会话连续）；关闭则回退 -p 单发 */
+    var agentSessionMode: Boolean
+        get() = prefs.getBoolean(KEY_AGENT_MODE, true)
+        set(value) = prefs.edit().putBoolean(KEY_AGENT_MODE, value).apply()
+
+    /** 持久化的 agent 会话 id（重启后续聊） */
+    var agentSessionId: String
+        get() = prefs.getString(KEY_AGENT_SESSION, "")!!
+        set(value) = prefs.edit().putString(KEY_AGENT_SESSION, value).apply()
+
     companion object {
         private const val KEY_NPM_PKG = "npm_pkg"
         private const val KEY_NODE_VER = "node_ver"
@@ -41,5 +51,7 @@ class Settings(context: Context) {
         private const val KEY_PORT = "bridge_port"
         private const val KEY_REGISTRY = "npm_registry"
         private const val KEY_PERM_MODE = "perm_mode"
+        private const val KEY_AGENT_MODE = "agent_mode"
+        private const val KEY_AGENT_SESSION = "agent_session"
     }
 }

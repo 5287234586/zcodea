@@ -64,13 +64,15 @@ sealed interface RuntimeState {
 
 /**
  * 运行时管理：
- * - chat：每次消息 = 一次 `zcode -p`（无 TUI，输出经 SSE 实时上屏）；同一时刻一条在跑；
+ * - agent：常驻 `zcode app-server --stdio` 的会话模式（v0.2 主路径，流式 + 会话连续）；
+ * - chat：`zcode -p` 单发模式（兼容回退）；同一时刻一条在跑；
  * - terminal：容器内常驻 bash（经 script 挂 PTY），输出进环形缓冲；
  * - login：`zcode login <provider> --no-browser`，把 OAuth URL 吐给手机浏览器。
  */
 class RuntimeManager(
     private val paths: EnvPaths,
     private val settings: Settings,
+    val appServer: AppServerClient,
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val jobId = AtomicLong(0)
@@ -78,6 +80,14 @@ class RuntimeManager(
 
     private val chatLock = Object()
     @Volatile private var chatBusy = false
+
+    private val agentLock = Object()
+
+    @Volatile var agentSessionId: String? = null
+        private set
+
+    private val _agentBusy = MutableStateFlow(false)
+    val agentBusy: StateFlow<Boolean> = _agentBusy
 
     private val _state = MutableStateFlow<RuntimeState>(RuntimeState.Stopped)
     val state: StateFlow<RuntimeState> = _state
@@ -224,8 +234,119 @@ class RuntimeManager(
 
     fun stopAll() {
         stopTerminal()
+        appServer.stop()
         jobs.values.filter { !it.done }.forEach { it.finish(-255) }
         setState(RuntimeState.Stopped)
+    }
+
+    // ---------------------------------------------------------------- agent（v0.2 会话模式）
+
+    sealed class AgentException(message: String) : Exception(message) {
+        class ServerDown(message: String) : AgentException(message)
+        class Protocol(message: String) : AgentException(message)
+    }
+
+    /**
+     * 发送一条消息到当前会话（无会话则先创建）。
+     * 返回 sessionId。流式输出经 appServer.events 广播到 /app/agent/events。
+     */
+    suspend fun agentSend(content: String): String {
+        synchronized(agentLock) {
+            if (_agentBusy.value) throw AgentException.ServerDown("已有消息在处理中")
+            _agentBusy.value = true
+        }
+        try {
+            if (!appServer.ensureStarted()) {
+                throw AgentException.ServerDown(
+                    (appServer.state.value as? AppServerClient.State.Down)?.reason ?: "app-server 启动失败",
+                )
+            }
+            var session: String? = agentSessionId ?: settings.agentSessionId.takeIf { it.isNotBlank() }
+            if (session != null) {
+                val ok = runCatching { sendToSession(session, content) }
+                if (ok.isSuccess) return session
+                log2("会话 $session 发送失败，重建会话重试")
+                session = null
+            }
+            session = createSession()
+            agentSessionId = session
+            settings.agentSessionId = session
+            sendToSession(session, content)
+            return session
+        } finally {
+            _agentBusy.value = false
+        }
+    }
+
+    private suspend fun sendToSession(sessionId: String, content: String) {
+        appServer.request(
+            "session/send",
+            org.json.JSONObject().put("sessionId", sessionId).put("content", content),
+            timeoutMs = 20_000,
+        )
+    }
+
+    private suspend fun createSession(): String {
+        // create 的响应可能迟到；同时监听 lifecycle 事件兜底取 sessionId
+        val eventSession = kotlinx.coroutines.CompletableDeferred<String>()
+        val collector = scope.launch {
+            appServer.events.collect { msg ->
+                if (msg.optString("method") == "session/lifecycle/changed") {
+                    val state = msg.optJSONObject("params")?.optString("state")
+                    if (state == "starting" || state == "ready" || state == "running") {
+                        val sid = msg.optJSONObject("params")?.optString("sessionId")
+                        if (sid != null) eventSession.complete(sid)
+                    }
+                }
+            }
+        }
+        try {
+            val result = appServer.request(
+                "session/create",
+                org.json.JSONObject().put(
+                    "workspace",
+                    org.json.JSONObject()
+                        .put("workspacePath", "/root/zsha")
+                        .put("workspaceKey", "/root/zsha"),
+                ),
+                timeoutMs = 60_000,
+            )
+            val sid = result.optString("sessionId", "")
+            if (sid.isNotEmpty()) return sid
+            return kotlinx.coroutines.withTimeout(30_000) { eventSession.await() }
+        } finally {
+            collector.cancel()
+        }
+    }
+
+    suspend fun agentStop() {
+        val session = agentSessionId ?: return
+        runCatching {
+            appServer.request("session/stop", org.json.JSONObject().put("sessionId", session), timeoutMs = 10_000)
+        }
+    }
+
+    suspend fun agentNewSession() {
+        agentStop()
+        agentSessionId = null
+        settings.agentSessionId = ""
+    }
+
+    suspend fun agentMessages(): org.json.JSONObject {
+        val session = agentSessionId ?: settings.agentSessionId.takeIf { it?.isNotBlank() == true }
+            ?: throw AgentException.Protocol("还没有会话")
+        return appServer.request("session/messages", org.json.JSONObject().put("sessionId", session), timeoutMs = 20_000)
+    }
+
+    fun agentServerStatus(): String = when (val s = appServer.state.value) {
+        AppServerClient.State.Stopped -> "stopped"
+        AppServerClient.State.Starting -> "starting"
+        AppServerClient.State.Ready -> "ready"
+        is AppServerClient.State.Down -> "down:${s.reason}"
+    }
+
+    private fun log2(line: String) {
+        android.util.Log.w("RuntimeManager", line)
     }
 }
 
