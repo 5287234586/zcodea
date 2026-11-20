@@ -23,15 +23,25 @@
 
 ## 与 DSHA 的对照
 
-| | DSHA | ZSHA v0.1 |
+| | DSHA | ZSHA v0.2 |
 | --- | --- | --- |
 | Harness | `@deepseek-ai/dsh` | `zcode-app-cli`（纯 Node，无原生模块） |
+| 驱动方式 | Web UI 插件 | **ZCode Protocol**（`app-server --stdio` 常驻会话，流式）+ `-p` 单发回退 |
 | rootfs 分发 | 内置离线（302MiB APK） | 首启下载（官方/清华镜像回退 + SHA-256 校验） |
 | 容器运行时 | proot / proroot | 双引擎：proot-android（主）+ Termux proot（回退），探针失败自动切换 |
-| 移动 UI | dsh-web-mobile | 内置聊天 Web UI（SSE 实时上屏） |
+| 移动 UI | dsh-web-mobile | 内置聊天 Web UI（SSE 实时上屏、停止/新建会话） |
 | 桥端口 | :3090 | :3090（仅 127.0.0.1） |
-| 设备能力 | 无障碍 + ADB/Shizuku/Root | 无障碍 + 剪贴板 + 通知（v0.1 无 ADB 通道） |
-| 架构 | 仅 arm64 | arm64 + x86_64（模拟器可全链路开发） |
+| 设备能力 | 无障碍 + ADB/Shizuku/Root | 无障碍 + 剪贴板 + 通知（ADB 通道规划中） |
+| 架构 | 仅 arm64 | arm64 + x86_64（模拟器可开发，见已知限制） |
+
+### 会话模式（v0.2）
+
+默认开启（设置里可关）。开启后每次发消息走常驻的 `zcode app-server --stdio`：
+
+- `session/create`（工作目录 /root/zsha）→ `session/send` → 事件流经 SSE 直推 Web UI
+- 会话跨消息保持上下文（ZCode 自身的会话持久化），应用重启后自动续接
+- 服务端反向请求（运行时偏好等）由桥自动应答；未知请求原样透传到 Web UI 供人工介入
+- 关闭时回退 v0.1 的 `-p` 单发模式（`POST /app/chat`）
 
 ## 使用
 
