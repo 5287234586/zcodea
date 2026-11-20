@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZSHA</string>
+    <string name="app_subtitle">ZCode Harness 安卓启动器</string>
+
+    <!-- 主页 -->
+    <string name="home_title">ZSHA 主页</string>
+    <string name="env_status_title">运行环境</string>
+    <string name="env_not_installed">环境未安装</string>
+    <string name="env_installing">正在安装环境…</string>
+    <string name="env_ready">环境就绪</string>
+    <string name="env_failed">安装失败</string>
+    <string name="runtime_stopped">服务未运行</string>
+    <string name="runtime_starting">正在启动…</string>
+    <string name="runtime_running">运行中 · 桥 %1$s</string>
+    <string name="runtime_crashed">已退出（看门狗将自动拉起）</string>
+    <string name="action_install">安装环境</string>
+    <string name="action_reinstall">修复 / 重装失败项</string>
+    <string name="action_start_service">启动服务</string>
+    <string name="action_stop_service">停止服务</string>
+    <string name="action_open_web">打开 Web UI</string>
+    <string name="action_terminal">终端</string>
+    <string name="action_settings">设置</string>
+    <string name="action_open_a11y">无障碍授权</string>
+    <string name="quick_guide_title">首次使用</string>
+    <string name="quick_guide_body">1. 安装环境（下载 Ubuntu + Node + ZCode）\n2. 启动服务\n3. 在 Web UI 里运行 `zcode login zai` 完成 GLM 授权\n4. 之后即可直接对话</string>
+    <string name="abi_unsupported">当前设备架构 %1$s 不受支持（需要 arm64-v8a 或 x86_64）</string>
+
+    <!-- 装机 -->
+    <string name="setup_title">装机流水线</string>
+    <string name="setup_step_proot">proot 容器运行时</string>
+    <string name="setup_step_rootfs">Ubuntu 24.04 基础环境</string>
+    <string name="setup_step_node">Node.js 运行时</string>
+    <string name="setup_step_zcode">ZCode CLI（npm）</string>
+    <string name="setup_step_verify">校验与回执</string>
+    <string name="setup_done">环境部署完成</string>
+    <string name="setup_log">安装日志</string>
+
+    <!-- 通知 -->
+    <string name="notification_channel">运行时</string>
+    <string name="notification_running_title">ZSHA 运行中</string>
+    <string name="notification_running_text">桥接服务 %1$s · 点按打开</string>
+
+    <!-- 终端 -->
+    <string name="terminal_title">简易终端</string>
+    <string name="terminal_hint">输入命令（回车发送到容器）</string>
+    <string name="terminal_start">启动 shell</string>
+    <string name="terminal_stop">停止</string>
+    <string name="terminal_not_started">终端未启动。点「启动 shell」在容器里开一个 bash。</string>
+
+    <!-- 设置 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_npm_pkg">ZCode npm 包名</string>
+    <string name="settings_node_ver">Node.js 版本</string>
+    <string name="settings_port">桥接端口</string>
+    <string name="settings_registry">npm registry</string>
+    <string name="settings_perm_mode">默认权限档位（--mode）</string>
+    <string name="settings_saved">已保存</string>
+    <string name="settings_danger_zone">危险区</string>
+    <string name="settings_wipe">清除环境数据</string>
+    <string name="settings_wipe_confirm">删除已下载的 rootfs / Node / ZCode？会话与配置将一并丢失。</string>
+
+    <!-- 无障碍 -->
+    <string name="accessibility_label">ZSHA 设备能力</string>
+    <string name="accessibility_summary">让容器里的 ZCode 读取屏幕、点按、输入与导航</string>
+    <string name="accessibility_desc">ZSHA 通过无障碍服务为容器内运行的 ZCode 智能体提供读屏、点按、输入、滚动与返回等设备能力。所有能力仅在收到本机桥接请求时触发，不上传任何数据。</string>
+
+    <!-- 其他 -->
+    <string name="back">返回</string>
+    <string name="send">发送</string>
+    <string name="cancel">取消</string>
+    <string name="ok">确定</string>
+</resources>

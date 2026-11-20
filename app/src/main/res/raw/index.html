@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZSHA</title>
+<style>
+  :root {
+    --bg: #0b1220; --panel: #111a2c; --line: #1f2c44; --text: #e6ecf5;
+    --muted: #8fa1bd; --accent: #4f8ff7; --user: #1d4ed8; --ok: #2ea36b; --warn: #d97706;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header .logo { font-weight: 700; letter-spacing: 1px; }
+  header .pill { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  header .pill.ready { color: var(--ok); border-color: var(--ok); }
+  header .pill.busy { color: var(--warn); border-color: var(--warn); }
+  header .spacer { flex: 1; }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 14px; font-size: 14px; cursor: pointer;
+  }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--user); border-color: var(--user); }
+  #chat { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 92%; padding: 9px 12px; border-radius: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
+  .msg.agent { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg.agent.streaming::after { content: "▊"; color: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .msg.error { align-self: center; background: #2a1215; border: 1px solid #7f1d1d; color: #fca5a5; font-size: 13px; }
+  .hint { color: var(--muted); font-size: 13px; text-align: center; margin-top: 8px; }
+  footer { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); }
+  #input { flex: 1; background: #0d1526; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 15px; outline: none; }
+  #input:focus { border-color: var(--accent); }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; max-width: 92vw; padding: 18px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h3 { margin: 0 0 12px; font-size: 16px; }
+  dialog .row { display: flex; gap: 8px; margin-top: 12px; }
+  dialog a { color: var(--accent); word-break: break-all; }
+  .muted { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">ZSHA</span>
+  <span class="pill" id="status">…</span>
+  <span class="spacer"></span>
+  <button id="loginBtn" title="登录 GLM">登录</button>
+</header>
+
+<div id="chat">
+  <div class="hint">消息每次以 <code>zcode -p</code> 无界面模式运行；工作目录 /root/zsha。<br>首次使用请先点右上角「登录」完成 GLM 授权。</div>
+</div>
+
+<footer>
+  <input id="input" placeholder="给 ZCode 派个活…" autocomplete="off">
+  <button id="sendBtn" class="primary">发送</button>
+</footer>
+
+<dialog id="loginDialog">
+  <h3>登录 GLM</h3>
+  <p class="muted">选择登录方式，然后把授权链接在手机浏览器里打开。</p>
+  <div class="row">
+    <button data-provider="zai">Z.AI 账号</button>
+    <button data-provider="bigmodel">BigModel API</button>
+    <button id="loginClose">关闭</button>
+  </div>
+  <div id="loginStatus" class="muted" style="margin-top:12px"></div>
+  <p id="loginUrlBox" style="display:none"><a id="loginUrl" target="_blank" rel="noopener"></a></p>
+</dialog>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const statusPill = document.getElementById('status');
+const loginBtn = document.getElementById('loginBtn');
+const loginDialog = document.getElementById('loginDialog');
+const loginStatus = document.getElementById('loginStatus');
+const loginUrlBox = document.getElementById('loginUrlBox');
+const loginUrl = document.getElementById('loginUrl');
+let streaming = false;
+
+function addMsg(cls, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text || '';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function refreshStatus() {
+  try {
+    const r = await fetch('/app/status');
+    const s = await r.json();
+    const phase = s.phase === 'ready' ? '就绪' : s.phase.startsWith('installing') ? '装机中' :
+      s.phase.startsWith('failed') ? '装机失败' : s.phase.startsWith('abi') ? '架构不支持' : '未安装';
+    statusPill.textContent = phase + (s.chatBusy ? ' · 任务中' : '');
+    statusPill.className = 'pill ' + (s.phase === 'ready' ? 'ready' : (s.chatBusy ? 'busy' : ''));
+    sendBtn.disabled = streaming || s.phase !== 'ready';
+    loginBtn.disabled = s.phase !== 'ready';
+  } catch (e) {
+    statusPill.textContent = '桥不可达';
+  }
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text || streaming) return;
+  input.value = '';
+  addMsg('user', text);
+  streaming = true;
+  sendBtn.disabled = true;
+  let job;
+  try {
+    const r = await fetch('/app/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    if (r.status === 409) { addMsg('error', '已有任务在运行，请等它完成。'); return; }
+    if (!r.ok) { addMsg('error', '发送失败：HTTP ' + r.status); return; }
+    job = (await r.json()).job;
+  } catch (e) {
+    addMsg('error', '发送失败：' + e.message);
+    return;
+  } finally { streaming = false; refreshStatus(); }
+
+  const bubble = addMsg('agent', '');
+  bubble.classList.add('streaming');
+  let got = 0;
+  const es = new EventSource(`/app/chat/stream?job=${job}&after=0`);
+  es.addEventListener('line', e => {
+    if (got > 0) bubble.textContent += '\n';
+    bubble.textContent += e.data;
+    got++;
+    chat.scrollTop = chat.scrollHeight;
+  });
+  es.addEventListener('done', e => {
+    es.close();
+    bubble.classList.remove('streaming');
+    const exit = JSON.parse(e.data).exit;
+    if (got === 0) bubble.textContent = exit === 0 ? '(空回复)' : `(退出码 ${exit}，无输出)`;
+    if (exit !== 0 && got > 0) bubble.textContent += `\n[退出码 ${exit}]`;
+    refreshStatus();
+  });
+  es.onerror = () => {
+    es.close();
+    bubble.classList.remove('streaming');
+    pollResult(job, bubble);
+  };
+}
+
+async function pollResult(job, bubble) {
+  try {
+    const r = await fetch(`/app/chat/result?job=${job}&after=${bubble.dataset.after || 0}`);
+    const j = await r.json();
+    if (j.lines.length) {
+      if (bubble.textContent) bubble.textContent += '\n';
+      bubble.textContent += j.lines.join('\n');
+    }
+    bubble.dataset.after = j.after;
+    if (j.done) { refreshStatus(); return; }
+    setTimeout(() => pollResult(job, bubble), 800);
+  } catch (e) { refreshStatus(); }
+}
+
+loginBtn.onclick = () => { loginDialog.showModal(); };
+document.getElementById('loginClose').onclick = () => loginDialog.close();
+loginDialog.querySelectorAll('button[data-provider]').forEach(btn => {
+  btn.onclick = async () => {
+    const provider = btn.dataset.provider;
+    loginStatus.textContent = '正在启动 zcode login ' + provider + ' …';
+    loginUrlBox.style.display = 'none';
+    try {
+      const r = await fetch('/app/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider })
+      });
+      if (!r.ok) { loginStatus.textContent = '启动失败：HTTP ' + r.status; return; }
+      const { job } = await r.json();
+      for (let i = 0; i < 60; i++) {
+        const jr = await (await fetch(`/app/job?id=${job}`)).json();
+        if (jr.loginUrl) {
+          loginUrl.href = jr.loginUrl;
+          loginUrl.textContent = jr.loginUrl;
+          loginUrlBox.style.display = 'block';
+          loginStatus.textContent = '点上面的链接完成浏览器授权，完成后本对话框会自动结束。';
+          return;
+        }
+        if (jr.done) {
+          loginStatus.textContent = '进程已退出（exit=' + jr.exit + '）。若未完成授权，请重试。';
+          return;
+        }
+        await new Promise(res => setTimeout(res, 1000));
+      }
+      loginStatus.textContent = '等待超时，请重试。';
+    } catch (e) {
+      loginStatus.textContent = '出错：' + e.message;
+    }
+  };
+});
+
+sendBtn.onclick = send;
+input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+refreshStatus();
+setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>

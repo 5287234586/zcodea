@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZSHA</string>
+    <string name="app_subtitle">ZCode Harness Android Launcher</string>
+
+    <string name="home_title">ZSHA Home</string>
+    <string name="env_status_title">Runtime environment</string>
+    <string name="env_not_installed">Environment not installed</string>
+    <string name="env_installing">Installing environment…</string>
+    <string name="env_ready">Environment ready</string>
+    <string name="env_failed">Install failed</string>
+    <string name="runtime_stopped">Service stopped</string>
+    <string name="runtime_starting">Starting…</string>
+    <string name="runtime_running">Running · bridge %1$s</string>
+    <string name="runtime_crashed">Exited (watchdog will restart)</string>
+    <string name="action_install">Install environment</string>
+    <string name="action_reinstall">Repair / reinstall failed steps</string>
+    <string name="action_start_service">Start service</string>
+    <string name="action_stop_service">Stop service</string>
+    <string name="action_open_web">Open Web UI</string>
+    <string name="action_terminal">Terminal</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_open_a11y">Accessibility grant</string>
+    <string name="quick_guide_title">First run</string>
+    <string name="quick_guide_body">1. Install environment (downloads Ubuntu + Node + ZCode)\n2. Start the service\n3. Run `zcode login zai` in the Web UI to authorize GLM\n4. Then just chat</string>
+    <string name="abi_unsupported">Unsupported ABI %1$s (requires arm64-v8a or x86_64)</string>
+
+    <string name="setup_title">Install pipeline</string>
+    <string name="setup_step_proot">proot container runtime</string>
+    <string name="setup_step_rootfs">Ubuntu 24.04 base</string>
+    <string name="setup_step_node">Node.js runtime</string>
+    <string name="setup_step_zcode">ZCode CLI (npm)</string>
+    <string name="setup_step_verify">Verify &amp; receipt</string>
+    <string name="setup_done">Environment ready</string>
+    <string name="setup_log">Install log</string>
+
+    <string name="notification_channel">Runtime</string>
+    <string name="notification_running_title">ZSHA running</string>
+    <string name="notification_running_text">Bridge %1$s · tap to open</string>
+
+    <string name="terminal_title">Simple terminal</string>
+    <string name="terminal_hint">Type a command (Enter sends it to the container)</string>
+    <string name="terminal_start">Start shell</string>
+    <string name="terminal_stop">Stop</string>
+    <string name="terminal_not_started">Terminal not started. Tap "Start shell" to open a bash in the container.</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_npm_pkg">ZCode npm package</string>
+    <string name="settings_node_ver">Node.js version</string>
+    <string name="settings_port">Bridge port</string>
+    <string name="settings_registry">npm registry</string>
+    <string name="settings_perm_mode">Default permission mode (--mode)</string>
+    <string name="settings_saved">Saved</string>
+    <string name="settings_danger_zone">Danger zone</string>
+    <string name="settings_wipe">Wipe environment data</string>
+    <string name="settings_wipe_confirm">Delete downloaded rootfs / Node / ZCode? Sessions and configuration will be lost.</string>
+
+    <string name="accessibility_label">ZSHA device capabilities</string>
+    <string name="accessibility_summary">Let ZCode running in the container read the screen, tap, type and navigate</string>
+    <string name="accessibility_desc">ZSHA exposes screen reading, tapping, typing, scrolling and back navigation to the ZCode agent running inside the container via the accessibility service. Capabilities trigger only on local bridge requests; nothing is uploaded.</string>
+
+    <string name="back">Back</string>
+    <string name="send">Send</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+</resources>
