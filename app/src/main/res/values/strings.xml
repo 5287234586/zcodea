@@ -58,6 +58,13 @@
     <string name="settings_agent_mode">会话模式（app-server 流式，关闭则 -p 单发）</string>
     <string name="settings_saved">已保存</string>
     <string name="settings_danger_zone">危险区</string>
+    <string name="lan_title">局域网访问</string>
+    <string name="lan_body">电脑 / 平板浏览器直接打开下面的地址（同一 Wi-Fi）。明文 HTTP，只建议在可信网络使用；改开关后需重启服务生效。</string>
+    <string name="lan_off">已关闭（仅本机 127.0.0.1）</string>
+    <string name="lan_token">Token</string>
+    <string name="lan_regenerate">重新生成</string>
+    <string name="lan_copy">复制</string>
+    <string name="lan_copied">已复制</string>
     <string name="settings_wipe">清除环境数据</string>
     <string name="settings_wipe_confirm">删除已下载的 rootfs / Node / ZCode？会话与配置将一并丢失。</string>
 

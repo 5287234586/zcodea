@@ -99,6 +99,13 @@ const loginStatus = document.getElementById('loginStatus');
 const loginUrlBox = document.getElementById('loginUrlBox');
 const loginUrl = document.getElementById('loginUrl');
 
+const qsToken = new URLSearchParams(location.search).get('token');
+if (qsToken) {
+  sessionStorage.setItem('zsha_token', qsToken);
+  history.replaceState(null, '', location.pathname);
+}
+function tk() { return sessionStorage.getItem('zsha_token') || ''; }
+function api(path) { return path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(tk()); }
 let mode = 'session';      // session | prompt
 let envReady = false;
 let agentBusy = false;
@@ -165,7 +172,7 @@ function extractText(params) {
 
 async function refreshStatus() {
   try {
-    const r = await fetch('/app/status');
+    const r = await fetch(api('/app/status'));
     const s = await r.json();
     envReady = s.phase === 'ready';
     mode = s.agentMode ? 'session' : 'prompt';
@@ -185,7 +192,7 @@ async function refreshStatus() {
 
 function ensureEventStream() {
   if (eventsEs || mode !== 'session' || !envReady) return;
-  eventsEs = new EventSource('/app/agent/events');
+  eventsEs = new EventSource(api('/app/agent/events'));
   eventsEs.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
@@ -231,7 +238,7 @@ async function send() {
   sendBtn.disabled = true;
 
   if (mode === 'session') {
-    const r = await fetch('/app/agent/send', {
+    const r = await fetch(api('/app/agent/send'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
     });
@@ -249,7 +256,7 @@ async function send() {
   streaming = true;
   let job;
   try {
-    const r = await fetch('/app/chat', {
+    const r = await fetch(api('/app/chat'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
     });
@@ -264,7 +271,7 @@ async function send() {
   const bubble = addMsg('agent', '');
   bubble.classList.add('streaming');
   let got = 0;
-  const es = new EventSource(`/app/chat/stream?job=${job}&after=0`);
+  const es = new EventSource(api(`/app/chat/stream?job=${job}&after=0`));
   es.addEventListener('line', e => {
     if (got > 0) bubble.textContent += '\n';
     bubble.textContent += e.data;
@@ -288,7 +295,7 @@ async function send() {
 
 async function pollResult(job, bubble) {
   try {
-    const r = await fetch(`/app/chat/result?job=${job}&after=${bubble.dataset.after || 0}`);
+    const r = await fetch(api(`/app/chat/result?job=${job}&after=${bubble.dataset.after || 0}`));
     const j = await r.json();
     if (j.lines.length) {
       if (bubble.textContent) bubble.textContent += '\n';
@@ -301,13 +308,13 @@ async function pollResult(job, bubble) {
 }
 
 newBtn.onclick = async () => {
-  await fetch('/app/agent/new', { method: 'POST' });
+  await fetch(api('/app/agent/new'), { method: 'POST' });
   addEvt('会话', '已新建（下一轮生效）');
   refreshStatus();
 };
 
 stopBtn.onclick = async () => {
-  await fetch('/app/agent/stop', { method: 'POST' });
+  await fetch(api('/app/agent/stop'), { method: 'POST' });
   if (currentBubble) { currentBubble.classList.remove('streaming'); currentBubble = null; }
   addEvt('会话', '已请求停止');
   refreshStatus();
@@ -321,14 +328,14 @@ loginDialog.querySelectorAll('button[data-provider]').forEach(btn => {
     loginStatus.textContent = '正在启动 zcode login ' + provider + ' …';
     loginUrlBox.style.display = 'none';
     try {
-      const r = await fetch('/app/login', {
+      const r = await fetch(api('/app/login'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider })
       });
       if (!r.ok) { loginStatus.textContent = '启动失败：HTTP ' + r.status; return; }
       const { job } = await r.json();
       for (let i = 0; i < 60; i++) {
-        const jr = await (await fetch(`/app/job?id=${job}`)).json();
+        const jr = await (await fetch(api(`/app/job?id=${job}`))).json();
         if (jr.loginUrl) {
           loginUrl.href = jr.loginUrl;
           loginUrl.textContent = jr.loginUrl;

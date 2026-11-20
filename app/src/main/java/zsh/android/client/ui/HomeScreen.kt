@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -127,6 +128,9 @@ fun HomeScreen(
             }
         }
 
+        // ---- 局域网访问 ----
+        LanCard()
+
         // ---- 快速指南 ----
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -141,6 +145,77 @@ fun HomeScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.action_settings)) }
+        }
+    }
+}
+
+private fun lanIpv4(): String? = runCatching {
+    java.net.NetworkInterface.getNetworkInterfaces().asSequence()
+        .filter { it.isUp && !it.isLoopback }
+        .flatMap { it.inetAddresses.asSequence() }
+        .firstOrNull { it is java.net.Inet4Address && it.isSiteLocalAddress }
+        ?.hostAddress
+}.getOrNull()
+
+@Composable
+private fun LanCard() {
+    val context = LocalContext.current
+    val app = context.applicationContext as ZshaApp
+    var version by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var enabled by androidx.compose.runtime.remember(version) {
+        androidx.compose.runtime.mutableStateOf(app.settings.lanEnabled)
+    }
+    val token = androidx.compose.runtime.remember(version) { app.settings.ensureLanToken() }
+    val copied = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val ip = androidx.compose.runtime.remember(version) { lanIpv4() }
+    val runtime by app.runtimeManager.state.collectAsState()
+    val port = (runtime as? RuntimeState.Running)?.port ?: app.settings.bridgePort
+
+    fun copy(text: String) {
+        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("zcodea", text))
+        copied.value = true
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.lan_title), style = MaterialTheme.typography.titleMedium)
+                androidx.compose.material3.Switch(
+                    checked = enabled,
+                    onCheckedChange = {
+                        if (it) app.settings.ensureLanToken()
+                        app.settings.lanEnabled = it
+                        enabled = it
+                        version++
+                    },
+                )
+            }
+            Text(
+                if (enabled) stringResource(R.string.lan_body) else stringResource(R.string.lan_off),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (enabled) {
+                val url = "http://" + (ip ?: "<本机IP>") + ":" + port + "/?token=" + token
+                Text(url, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { copy(url) }) {
+                        Text(if (copied.value) stringResource(R.string.lan_copied) else stringResource(R.string.lan_copy))
+                    }
+                    OutlinedButton(onClick = {
+                        app.settings.regenerateLanToken()
+                        version++
+                    }) { Text(stringResource(R.string.lan_regenerate)) }
+                }
+                Text(
+                    "Token: " + token,
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 # ZCodeA — ZCode Harness 安卓启动器
 
+[![CI](https://github.com/5287234586/zcodea/actions/workflows/ci.yml/badge.svg)](https://github.com/5287234586/zcodea/actions/workflows/ci.yml)
+
 在手机上跑完整的 **ZCode**（GLM 官方编程智能体）—— 免 ROOT、免 Termux、装完即用。
 对标 [DSHA](https://github.com/DSH-APP/DSHA)（DeepSeek Harness 安卓启动器）的容器派路线，把运行时换成 ZCode。
 
@@ -70,7 +72,8 @@
 - **首次装机需联网**：rootfs/Node/ZCode 走官方源 + 清华镜像 + npmmirror 多路回退 + SHA-256 清单校验；断网无法装机（v0.2 计划内置离线包，像 DSHA 一样打进 APK）。
 - **无内核级沙箱**：proot 只是用户态路径转译，bubblewrap 在 Android sepolicy 下同样不可用（容器派与 Termux 派的共同边界）。权限靠 `--mode` 档位控制，默认 `yolo`，可在设置改为 `guarded`。
 - **简易终端非完整 xterm**：展示时清洗 ANSI 转义序列，vim/htop 等全屏 TUI 显示不完整；v0.2 计划接入 Termux terminal-emulator JNI。
-- **桥仅本机回环**：局域网访问与 token 鉴权未开放（v0.2 计划）。调试端点 `POST /app/env/exec`（容器内执行）仅 debug 构建开放 `!host` 前缀。
+- **局域网访问（v0.3）**：主页「局域网访问」开关开启后，桥绑定 0.0.0.0；非回环请求必须带 token（`Authorization: Bearer` / `X-Token` / `?token=` 任一），UI 地址栏自带 `?token=`。注意是**明文 HTTP**，只在可信 Wi-Fi 下用；token 可随时重新生成，开关切换需重启服务。
+- 调试端点 `POST /app/env/exec`（容器内执行）仅 debug 构建开放 `!host` 前缀。
 - **聊天为单发模式**：每次消息一个 `zcode -p` 进程，串行执行；会话恢复靠 zcode 自身的 `--resume`/`-c`（尚未接出）。
 - **无遥测**：不上传任何日志或使用数据。
 

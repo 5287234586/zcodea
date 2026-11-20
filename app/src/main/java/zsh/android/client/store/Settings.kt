@@ -44,6 +44,30 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_AGENT_SESSION, "")!!
         set(value) = prefs.edit().putString(KEY_AGENT_SESSION, value).apply()
 
+    /** v0.3 局域网访问：开启后桥绑定 0.0.0.0，非回环请求必须带 token */
+    var lanEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LAN_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_LAN_ENABLED, value).apply()
+
+    var lanToken: String
+        get() = prefs.getString(KEY_LAN_TOKEN, "")!!
+        set(value) = prefs.edit().putString(KEY_LAN_TOKEN, value).apply()
+
+    /** 首次访问时生成 24 位随机 token */
+    fun ensureLanToken(): String {
+        if (lanToken.isBlank()) {
+            val bytes = ByteArray(12)
+            java.security.SecureRandom().nextBytes(bytes)
+            lanToken = bytes.joinToString("") { "%02x".format(it) }
+        }
+        return lanToken
+    }
+
+    fun regenerateLanToken(): String {
+        lanToken = ""
+        return ensureLanToken()
+    }
+
     companion object {
         private const val KEY_NPM_PKG = "npm_pkg"
         private const val KEY_NODE_VER = "node_ver"
@@ -53,5 +77,7 @@ class Settings(context: Context) {
         private const val KEY_PERM_MODE = "perm_mode"
         private const val KEY_AGENT_MODE = "agent_mode"
         private const val KEY_AGENT_SESSION = "agent_session"
+        private const val KEY_LAN_ENABLED = "lan_enabled"
+        private const val KEY_LAN_TOKEN = "lan_token"
     }
 }

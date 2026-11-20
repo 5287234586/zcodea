@@ -29,15 +29,15 @@ import java.io.PipedInputStream
 import java.io.PipedOutputStream
 
 /**
- * 本机桥（对齐 DSHA 的 App 桥）：
- * 只绑定 127.0.0.1（局域网访问 v0.1 未开放），网页 UI 与设备能力端点都在这里。
+ * App 桥（对齐 DSHA 的 App 桥）。
+ * 默认只绑 127.0.0.1；开启局域网访问后绑 0.0.0.0，非回环请求一律要求 token。
  */
 class BridgeServer(
     private val context: Context,
     private val settings: Settings,
     private val runtime: RuntimeManager,
     private val env: EnvManager,
-) : NanoHTTPD("127.0.0.1", settings.bridgePort) {
+) : NanoHTTPD(if (settings.lanEnabled) null else "127.0.0.1", settings.bridgePort) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var stopped = false
@@ -61,9 +61,34 @@ class BridgeServer(
     fun isHealthy(): Boolean = !stopped && wasStarted()
 
     override fun serve(session: IHTTPSession): Response = try {
-        route(session) ?: notFound()
+        gate(session) ?: (route(session) ?: notFound())
     } catch (e: Exception) {
         json(Response.Status.INTERNAL_ERROR, JSONObject().put("error", e.message ?: "internal error"))
+    }
+
+    /**
+     * 访问门禁：回环放行；非回环要求「设置里已开启局域网」+ token
+     * （Authorization: Bearer <t> / X-Token: <t> / ?token=<t> 任一）。
+     */
+    private fun gate(session: IHTTPSession): Response? {
+        val remote = runCatching { session.remoteIpAddress }.getOrDefault("") ?: ""
+        val loopback = remote == "::1" || remote.startsWith("127.")
+        if (loopback) return null
+        if (!settings.lanEnabled) {
+            return json(
+                Response.Status.FORBIDDEN,
+                JSONObject().put("error", "局域网访问未开启（应用内主页 → 局域网访问）"),
+            )
+        }
+        val header = session.headers["authorization"] ?: ""
+        val bearer = if (header.startsWith("Bearer ")) header.removePrefix("Bearer ").trim() else ""
+        val supplied = bearer
+            .ifEmpty { session.headers["x-token"] ?: "" }
+            .ifEmpty { param(session, "token") ?: "" }
+        if (supplied.isEmpty() || supplied != settings.lanToken) {
+            return json(Response.Status.UNAUTHORIZED, JSONObject().put("error", "token 缺失或不匹配"))
+        }
+        return null
     }
 
     // ------------------------------------------------------------- routing
@@ -149,6 +174,7 @@ class BridgeServer(
             .put("agentServer", runtime.agentServerStatus())
             .put("agentSessionId", runtime.agentSessionId ?: JSONObject.NULL)
             .put("agentBusy", runtime.agentBusy.value)
+            .put("lan", settings.lanEnabled)
         if (receipt != null) obj.put("versions", JSONObject(receipt.versions.toMap()))
         return obj
     }
@@ -198,6 +224,7 @@ class BridgeServer(
             "POST /app/scroll      {dir: forward|backward}",
             "GET|POST /app/clipboard  读/写剪贴板",
             "POST /app/notify      {title, body} 系统通知",
+            "（局域网）非回环请求需 token：Authorization: Bearer / X-Token / ?token=",
         )
         return JSONArray(routes.toList())
     }

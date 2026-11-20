@@ -53,6 +53,13 @@
     <string name="settings_agent_mode">Session mode (app-server streaming; off = single-shot -p)</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_danger_zone">Danger zone</string>
+    <string name="lan_title">LAN access</string>
+    <string name="lan_body">Open the address below in a desktop/tablet browser on the same Wi-Fi. Plain HTTP — trusted networks only. Restart the service after toggling.</string>
+    <string name="lan_off">Off (loopback only)</string>
+    <string name="lan_token">Token</string>
+    <string name="lan_regenerate">Regenerate</string>
+    <string name="lan_copy">Copy</string>
+    <string name="lan_copied">Copied</string>
     <string name="settings_wipe">Wipe environment data</string>
     <string name="settings_wipe_confirm">Delete downloaded rootfs / Node / ZCode? Sessions and configuration will be lost.</string>
 
