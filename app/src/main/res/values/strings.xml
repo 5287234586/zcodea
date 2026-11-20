@@ -55,6 +55,7 @@
     <string name="settings_port">桥接端口</string>
     <string name="settings_registry">npm registry</string>
     <string name="settings_perm_mode">默认权限档位（--mode）</string>
+    <string name="settings_agent_mode">会话模式（app-server 流式，关闭则 -p 单发）</string>
     <string name="settings_saved">已保存</string>
     <string name="settings_danger_zone">危险区</string>
     <string name="settings_wipe">清除环境数据</string>

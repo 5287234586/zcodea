@@ -50,6 +50,7 @@
     <string name="settings_port">Bridge port</string>
     <string name="settings_registry">npm registry</string>
     <string name="settings_perm_mode">Default permission mode (--mode)</string>
+    <string name="settings_agent_mode">Session mode (app-server streaming; off = single-shot -p)</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_danger_zone">Danger zone</string>
     <string name="settings_wipe">Wipe environment data</string>

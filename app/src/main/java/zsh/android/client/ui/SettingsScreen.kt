@@ -11,6 +11,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +38,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var port by remember { mutableStateOf(s.bridgePort.toString()) }
     var registry by remember { mutableStateOf(s.npmRegistry) }
     var permMode by remember { mutableStateOf(s.permMode) }
+    var agentMode by remember { mutableStateOf(s.agentSessionMode) }
     var saved by remember { mutableStateOf(false) }
     var wipeAsk by remember { mutableStateOf(false) }
 
@@ -65,6 +67,11 @@ fun SettingsScreen(onBack: () -> Unit) {
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Switch(checked = agentMode, onCheckedChange = { agentMode = it })
+            Text(stringResource(R.string.settings_agent_mode), modifier = Modifier.padding(top = 12.dp))
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = {
                 s.npmPackage = npmPkg.trim()
                 s.nodeVersion = nodeVer.trim()
@@ -72,6 +79,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 s.bridgePort = port.trim().toIntOrNull() ?: s.bridgePort
                 s.npmRegistry = registry.trim()
                 s.permMode = permMode.trim()
+                s.agentSessionMode = agentMode
                 saved = true
             }) { Text("保存") }
             if (saved) Text(stringResource(R.string.settings_saved), color = MaterialTheme.colorScheme.secondary)
