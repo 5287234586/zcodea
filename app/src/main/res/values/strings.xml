@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ZSHA</string>
+    <string name="app_name">ZCodeA</string>
     <string name="app_subtitle">ZCode Harness 安卓启动器</string>
 
     <!-- 主页 -->
-    <string name="home_title">ZSHA 主页</string>
+    <string name="home_title">ZCodeA 主页</string>
     <string name="env_status_title">运行环境</string>
     <string name="env_not_installed">环境未安装</string>
     <string name="env_installing">正在安装环境…</string>
@@ -38,7 +38,7 @@
 
     <!-- 通知 -->
     <string name="notification_channel">运行时</string>
-    <string name="notification_running_title">ZSHA 运行中</string>
+    <string name="notification_running_title">ZCodeA 运行中</string>
     <string name="notification_running_text">桥接服务 %1$s · 点按打开</string>
 
     <!-- 终端 -->
@@ -62,9 +62,9 @@
     <string name="settings_wipe_confirm">删除已下载的 rootfs / Node / ZCode？会话与配置将一并丢失。</string>
 
     <!-- 无障碍 -->
-    <string name="accessibility_label">ZSHA 设备能力</string>
+    <string name="accessibility_label">ZCodeA 设备能力</string>
     <string name="accessibility_summary">让容器里的 ZCode 读取屏幕、点按、输入与导航</string>
-    <string name="accessibility_desc">ZSHA 通过无障碍服务为容器内运行的 ZCode 智能体提供读屏、点按、输入、滚动与返回等设备能力。所有能力仅在收到本机桥接请求时触发，不上传任何数据。</string>
+    <string name="accessibility_desc">ZCodeA 通过无障碍服务为容器内运行的 ZCode 智能体提供读屏、点按、输入、滚动与返回等设备能力。所有能力仅在收到本机桥接请求时触发，不上传任何数据。</string>
 
     <!-- 其他 -->
     <string name="back">返回</string>

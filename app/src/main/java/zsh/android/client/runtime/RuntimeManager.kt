@@ -142,7 +142,7 @@ class RuntimeManager(
             p.inputStream.bufferedReader().forEachLine { line -> job.append(line) }
             job.finish(p.waitFor())
         } catch (e: Exception) {
-            job.append("[zsha] 进程异常退出：${e.message}")
+            job.append("[zcodea] 进程异常退出：${e.message}")
             job.finish(-1)
         } finally {
             if (job.kind == Job.Kind.CHAT) {
@@ -188,10 +188,10 @@ class RuntimeManager(
                 val p = pb.start()
                 terminalProcess = p
                 terminalRunning = true
-                appendTerm("[zsha] bash 已启动（容器 /root）")
+                appendTerm("[zcodea] bash 已启动（容器 /root）")
                 scope.launch {
                     p.inputStream.bufferedReader().forEachLine { appendTerm(it) }
-                    appendTerm("[zsha] bash 已退出")
+                    appendTerm("[zcodea] bash 已退出")
                     synchronized(termLock) {
                         terminalRunning = false
                         terminalProcess = null
@@ -199,7 +199,7 @@ class RuntimeManager(
                 }
                 true
             } catch (e: Exception) {
-                appendTerm("[zsha] 无法启动终端：${e.message}")
+                appendTerm("[zcodea] 无法启动终端：${e.message}")
                 terminalRunning = false
                 false
             }

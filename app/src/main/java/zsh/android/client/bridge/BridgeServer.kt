@@ -167,6 +167,11 @@ class BridgeServer(
     }
 
     private fun help(): JSONObject {
+        val obj = JSONObject().put("bridge", "ZCodeA 0.2").put("routes", helpRoutes())
+        return obj
+    }
+
+    private fun helpRoutes(): JSONArray {
         val routes = arrayOf(
             "GET  /                移动 Web UI（聊天）",
             "GET  /app/help        本清单",
@@ -194,7 +199,7 @@ class BridgeServer(
             "GET|POST /app/clipboard  读/写剪贴板",
             "POST /app/notify      {title, body} 系统通知",
         )
-        return JSONObject().put("bridge", "ZSHA 0.1").put("routes", JSONArray(routes.toList()))
+        return JSONArray(routes.toList())
     }
 
     // ------------------------------------------------------------- chat / jobs
@@ -408,7 +413,7 @@ class BridgeServer(
 
     private fun screen(): Response {
         val svc = ZshAccessibilityService.instance
-            ?: return json(Response.Status.FORBIDDEN, JSONObject().put("error", "无障碍服务未开启（设置 → 无障碍 → ZSHA）"))
+            ?: return json(Response.Status.FORBIDDEN, JSONObject().put("error", "无障碍服务未开启（设置 → 无障碍 → ZCodeA）"))
         val tree = svc.dumpActiveWindow()
         return if (tree == null) json(Response.Status.FORBIDDEN, JSONObject().put("error", "无法读取当前窗口"))
         else jsonOk(tree)
@@ -447,7 +452,7 @@ class BridgeServer(
 
     private fun a11yForbidden(): Response = json(
         Response.Status.FORBIDDEN,
-        JSONObject().put("error", "无障碍服务未开启（设置 → 无障碍 → ZSHA）"),
+        JSONObject().put("error", "无障碍服务未开启（设置 → 无障碍 → ZCodeA）"),
     )
 
     // ------------------------------------------------------------- clipboard / notify
@@ -462,22 +467,22 @@ class BridgeServer(
         val text = readBody(session).optString("text")
         mainHandler.post {
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("zsha", text))
+            cm.setPrimaryClip(ClipData.newPlainText("zcodea", text))
         }
         return jsonOk(JSONObject().put("ok", true))
     }
 
     private fun notify_(session: IHTTPSession): Response {
         val body = readBody(session)
-        val title = body.optString("title", "ZSHA")
+        val title = body.optString("title", "ZCodeA")
         val text = body.optString("body", "")
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (nm.getNotificationChannel("zsha_agent") == null) {
+        if (nm.getNotificationChannel("zcodea_agent") == null) {
             nm.createNotificationChannel(
-                NotificationChannel("zsha_agent", "ZCode 通知", NotificationManager.IMPORTANCE_DEFAULT),
+                NotificationChannel("zcodea_agent", "ZCode 通知", NotificationManager.IMPORTANCE_DEFAULT),
             )
         }
-        val n = Notification.Builder(context, "zsha_agent")
+        val n = Notification.Builder(context, "zcodea_agent")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)

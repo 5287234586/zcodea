@@ -9,13 +9,13 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "zsh.android.client"
+        applicationId = "app.zcodea.client"
         minSdk = 26
         // targetSdk 28：targetSdk ≥29 时 Android W^X 策略禁止 exec 应用数据目录里的
         // proot 二进制（Termux 停在 28 同因）。侧载分发，不受商店 targetSdk 政策约束。
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {

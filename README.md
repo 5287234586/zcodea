@@ -1,4 +1,4 @@
-# ZSHA — ZCode Harness 安卓启动器
+# ZCodeA — ZCode Harness 安卓启动器
 
 在手机上跑完整的 **ZCode**（GLM 官方编程智能体）—— 免 ROOT、免 Termux、装完即用。
 对标 [DSHA](https://github.com/DSH-APP/DSHA)（DeepSeek Harness 安卓启动器）的容器派路线，把运行时换成 ZCode。
@@ -23,7 +23,7 @@
 
 ## 与 DSHA 的对照
 
-| | DSHA | ZSHA v0.2 |
+| | DSHA | ZCodeA v0.2 |
 | --- | --- | --- |
 | Harness | `@deepseek-ai/dsh` | `zcode-app-cli`（纯 Node，无原生模块） |
 | 驱动方式 | Web UI 插件 | **ZCode Protocol**（`app-server --stdio` 常驻会话，流式）+ `-p` 单发回退 |

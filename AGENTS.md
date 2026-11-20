@@ -4,7 +4,7 @@
 
 ## 项目是什么
 
-ZSHA（ZCode Harness 安卓启动器）：在 Android 上免 ROOT 运行 **ZCode**（GLM 官方编程智能体，npm 包 `zcode-app-cli`，bin = `zcode`）。对标 [DSHA](https://github.com/DSH-APP/DSHA)（DeepSeek Harness 安卓启动器），运行时从 DSH 换成 ZCode。**注意：ZCode 是另一个独立产品，本仓库不是 ZCode 本体，只是它的安卓启动器。**
+ZCodeA（ZCode Harness 安卓启动器，仓库历史名 zsha）：在 Android 上免 ROOT 运行 **ZCode**（GLM 官方编程智能体，npm 包 `zcode-app-cli`，bin = `zcode`）。对标 [DSHA](https://github.com/DSH-APP/DSHA)（DeepSeek Harness 安卓启动器），运行时从 DSH 换成 ZCode。**注意：ZCode 是另一个独立产品，本仓库不是 ZCode 本体，只是它的安卓启动器。**
 
 ## 结构（单模块 :app，Kotlin + Compose M3）
 

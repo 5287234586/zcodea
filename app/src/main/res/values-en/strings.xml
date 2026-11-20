@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ZSHA</string>
+    <string name="app_name">ZCodeA</string>
     <string name="app_subtitle">ZCode Harness Android Launcher</string>
 
-    <string name="home_title">ZSHA Home</string>
+    <string name="home_title">ZCodeA Home</string>
     <string name="env_status_title">Runtime environment</string>
     <string name="env_not_installed">Environment not installed</string>
     <string name="env_installing">Installing environment…</string>
@@ -35,7 +35,7 @@
     <string name="setup_log">Install log</string>
 
     <string name="notification_channel">Runtime</string>
-    <string name="notification_running_title">ZSHA running</string>
+    <string name="notification_running_title">ZCodeA running</string>
     <string name="notification_running_text">Bridge %1$s · tap to open</string>
 
     <string name="terminal_title">Simple terminal</string>
@@ -56,9 +56,9 @@
     <string name="settings_wipe">Wipe environment data</string>
     <string name="settings_wipe_confirm">Delete downloaded rootfs / Node / ZCode? Sessions and configuration will be lost.</string>
 
-    <string name="accessibility_label">ZSHA device capabilities</string>
+    <string name="accessibility_label">ZCodeA device capabilities</string>
     <string name="accessibility_summary">Let ZCode running in the container read the screen, tap, type and navigate</string>
-    <string name="accessibility_desc">ZSHA exposes screen reading, tapping, typing, scrolling and back navigation to the ZCode agent running inside the container via the accessibility service. Capabilities trigger only on local bridge requests; nothing is uploaded.</string>
+    <string name="accessibility_desc">ZCodeA exposes screen reading, tapping, typing, scrolling and back navigation to the ZCode agent running inside the container via the accessibility service. Capabilities trigger only on local bridge requests; nothing is uploaded.</string>
 
     <string name="back">Back</string>
     <string name="send">Send</string>
